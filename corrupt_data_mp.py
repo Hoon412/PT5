@@ -5,7 +5,6 @@ import random
 from tqdm import tqdm
 from g2pk import G2p
 from multiprocessing import Pool
-import multiprocessing
 from unicode import join_jamos
 from jamo import h2j, j2hcj
 
@@ -92,13 +91,13 @@ JONGSUNG_LIST = [
 ]
 
 DIRS = [
-    # "NIKL_GOO_v1.0",
-    # "NIKL_KParlty_2021_v1.0",
+    "NIKL_GOO_v1.0",
+    "NIKL_KParlty_2021_v1.0",
     "NIKL_MOON_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.0",
+    "NIKL_NEWSPAPER_2021_v1.0",
     # "NIKL_NEWSPAPER_2021_v1.1",
     # "NIKL_NEWSPAPER_2021_v2.0",
-    # "wiki_text",
+    "wiki_text",
 ]
 
 
@@ -132,7 +131,13 @@ def yield_data():
 
 
 def g2p_noise(text):
-    noised = g2p(text)
+    try:
+        noised = g2p(text)
+    except:
+        output_path = "./data/debug/" + "hing.txt"
+        noised = text + "\n"
+        f = open(output_path, "a")
+        f.writelines(noised)
     # noised = text
     return noised
 
@@ -309,27 +314,27 @@ def noise_file(filepath):
         line = line.strip()
         g2p_noise_added.append(line + "\t" + inject_noise(line, "g2p") + "\n")
 
-    for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
-        line = line.strip()
-        delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
+    # for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
+    #     line = line.strip()
+    #     delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
 
-    for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
-        line = line.strip()
-        add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
+    # for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
+    #     line = line.strip()
+    #     add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
 
-    for line in lines[len(lines) * 13 // 15 + 1 :]:
-        line = line.strip()
-        swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
+    # for line in lines[len(lines) * 13 // 15 + 1 :]:
+    #     line = line.strip()
+    #     swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
 
-    output_path = "./data/corrupted/" + dir + "/mp_" + filename
-    print("saving at", output_path)
-    output_f = open(output_path, "w")
-    output_f.writelines(original)
-    output_f.writelines(g2p_noise_added)
-    output_f.writelines(delete_noise_added)
-    output_f.writelines(add_noise_added)
-    output_f.writelines(swap_noise_added)
-    output_f.close()
+    # output_path = "./data/debug/" + "/mp_" + filename
+    # print("saving at", output_path)
+    # output_f = open(output_path, "w")
+    # output_f.writelines(original)
+    # output_f.writelines(g2p_noise_added)
+    # output_f.writelines(delete_noise_added)
+    # output_f.writelines(add_noise_added)
+    # output_f.writelines(swap_noise_added)
+    # output_f.close()
 
 
 if __name__ == "__main__":

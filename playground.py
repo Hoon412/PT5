@@ -3,7 +3,7 @@ from unicode import join_jamos
 from g2pk import G2p
 from multiprocessing import Pool
 import random
-import datetime
+import g2pk
 
 # 초성 리스트. 00 ~ 18
 CHOSUNG_LIST = [
@@ -84,7 +84,7 @@ JONGSUNG_LIST = [
 ]
 
 
-random.seed(428)
+random.seed(4218)
 g2p = G2p()
 TOLERANCE = 1000
 
@@ -177,16 +177,29 @@ def swap_noise(text):
 
 
 if __name__ == "__main__":
-    past = datetime.datetime.now()
-    text = ["바다는 비에 젖지 않는다." for i in range(1000)]
+    text = ["바다는 비에 젖지 않는다." for i in range(10)]
+    text = ["사람들은 아버지를 난장이라고 불렀다." for i in range(20)]
+    text = [
+        "1000원, 2000원, 3000원",
+        "1000원 2000원 3000원",
+        "1234, 2000, 3000",
+        "1,123 2,000 3,000",
+    ]
     noised = []
 
-    pool = Pool(8)
+    # pool = Pool(8)
+    # new_sentence = pool.map(g2p_noise, text)
+    # noised.extend(new_sentence)
 
-    new_sentence = pool.map(g2p_noise, text)
-    noised.extend(new_sentence)
+    for sentence in text:
+        noised.append(g2p_noise(sentence))
+        noised.append(g2pk.numerals.convert_num("3시/B 10분/B에 만나자."))
+    # for sentence in text:
+    #     noised.append(add_noise(sentence))
+    # for sentence in text:
+    #     noised.append(delete_noise(sentence))
+    # for sentence in text:
+    #     noised.append(swap_noise(sentence))
 
-    now = datetime.datetime.now()
     with open("./test2.txt", "w+") as f:
         f.write("\n".join(noised))
-    print(now - past)
