@@ -4,6 +4,8 @@ import random
 
 from tqdm import tqdm
 from g2pk import G2p
+from multiprocessing import Pool
+import multiprocessing
 from unicode import join_jamos
 from jamo import h2j, j2hcj
 
@@ -90,9 +92,9 @@ JONGSUNG_LIST = [
 ]
 
 DIRS = [
-    "NIKL_GOO_v1.0",
+    # "NIKL_GOO_v1.0",
     # "NIKL_KParlty_2021_v1.0",
-    # "NIKL_MOON_v1.0",
+    "NIKL_MOON_v1.0",
     # "NIKL_NEWSPAPER_2021_v1.0",
     # "NIKL_NEWSPAPER_2021_v1.1",
     # "NIKL_NEWSPAPER_2021_v2.0",
@@ -108,7 +110,17 @@ def get_file_num():
     return acc
 
 
-def yield_data(args):
+def get_filepathes():
+    path = "./data/processed"
+    filepathes = []
+    for dir in DIRS:
+        filenames = os.listdir(path + "/" + dir)
+        for filename in filenames:
+            filepathes.append(path + "/" + dir + "/" + filename)
+    return filepathes
+
+
+def yield_data():
     path = "./data/processed"
 
     for dir in DIRS:
@@ -234,13 +246,8 @@ def calc_ratio(l1, l2, l3, l4, l5):
     print("swap ratio:", len5 / tot)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="preprocess data")
-    parser.add_argument("--start", type=int)
-    parser.add_argument("--end", type=int)
-    args = parser.parse_args()
-
-    for lines, dir, filename in tqdm(yield_data(args), total=get_file_num()):
+def main(args):
+    for lines, dir, filename in tqdm(yield_data(), total=get_file_num()):
         original = []
         g2p_noise_added = []
         delete_noise_added = []
@@ -267,7 +274,7 @@ if __name__ == "__main__":
             line = line.strip()
             swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
 
-        output_path = "./data/corrupted/" + dir + "/" + filename
+        output_path = "./data/corrupted/" + dir + "/mp_" + filename
         output_f = open(output_path, "w")
         output_f.writelines(original)
         output_f.writelines(g2p_noise_added)
@@ -275,3 +282,58 @@ if __name__ == "__main__":
         output_f.writelines(add_noise_added)
         output_f.writelines(swap_noise_added)
         output_f.close()
+
+
+def noise_file(filepath):
+    splited = filepath.split("/")
+    filename = splited[-1]
+    dir = splited[3]
+
+    f = open(filepath)
+    lines = f.readlines()
+    random.shuffle(lines)
+
+    print(filepath, "start")
+
+    original = []
+    g2p_noise_added = []
+    delete_noise_added = []
+    add_noise_added = []
+    swap_noise_added = []
+
+    for line in lines[0 : len(lines) // 5]:
+        line = line.strip()
+        original.append(line + "\t" + line + "\n")
+
+    for line in lines[len(lines) // 5 + 1 : len(lines) * 3 // 5]:
+        line = line.strip()
+        g2p_noise_added.append(line + "\t" + inject_noise(line, "g2p") + "\n")
+
+    for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
+        line = line.strip()
+        delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
+
+    for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
+        line = line.strip()
+        add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
+
+    for line in lines[len(lines) * 13 // 15 + 1 :]:
+        line = line.strip()
+        swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
+
+    output_path = "./data/corrupted/" + dir + "/mp_" + filename
+    print("saving at", output_path)
+    output_f = open(output_path, "w")
+    output_f.writelines(original)
+    output_f.writelines(g2p_noise_added)
+    output_f.writelines(delete_noise_added)
+    output_f.writelines(add_noise_added)
+    output_f.writelines(swap_noise_added)
+    output_f.close()
+
+
+if __name__ == "__main__":
+    filepathes = get_filepathes()
+    # print(multiprocessing.cpu_count())
+    pool = Pool(64)
+    pool.map(noise_file, filepathes)

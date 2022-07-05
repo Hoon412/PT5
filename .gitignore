@@ -1,3 +1,4 @@
 data/
 model/
 backup/
+__pycache__/

@@ -1,15 +1,9 @@
-import argparse
-import os
-import random
-
-from tqdm import tqdm
-from g2pk import G2p
-from unicode import join_jamos
 from jamo import h2j, j2hcj
-
-random.seed(428)
-g2p = G2p()
-TOLERANCE = 1000
+from unicode import join_jamos
+from g2pk import G2p
+from multiprocessing import Pool
+import random
+import datetime
 
 # 초성 리스트. 00 ~ 18
 CHOSUNG_LIST = [
@@ -89,39 +83,14 @@ JONGSUNG_LIST = [
     "ㅎ",
 ]
 
-DIRS = [
-    "NIKL_GOO_v1.0",
-    # "NIKL_KParlty_2021_v1.0",
-    # "NIKL_MOON_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.1",
-    # "NIKL_NEWSPAPER_2021_v2.0",
-    # "wiki_text",
-]
 
-
-def get_file_num():
-    path = "./data/processed"
-    acc = 0
-    for dir in DIRS:
-        acc += len(os.listdir(path + "/" + dir))
-    return acc
-
-
-def yield_data(args):
-    path = "./data/processed"
-
-    for dir in DIRS:
-        for filename in os.listdir(path + "/" + dir):
-            f = open(path + "/" + dir + "/" + filename, "r")
-            lines = f.readlines()
-            random.shuffle(lines)
-            yield lines, dir, filename  # [approxmately 50000 lines], "dir_name", "file_name"
+random.seed(428)
+g2p = G2p()
+TOLERANCE = 1000
 
 
 def g2p_noise(text):
     noised = g2p(text)
-    # noised = text
     return noised
 
 
@@ -207,71 +176,17 @@ def swap_noise(text):
     return noised
 
 
-def inject_noise(line, type):
-    if type == "g2p":
-        return g2p_noise(line)
-    elif type == "del":
-        return add_noise(line)
-    elif type == "add":
-        return delete_noise(line)
-    elif type == "swap":
-        return swap_noise(line)
-    else:
-        return line
-
-
-def calc_ratio(l1, l2, l3, l4, l5):
-    len1 = len(l1)
-    len2 = len(l2)
-    len3 = len(l3)
-    len4 = len(l4)
-    len5 = len(l5)
-    tot = len1 + len2 + len3 + len4 + len5
-    print("original ratio:", len1 / tot)
-    print("g2p ratio:", len2 / tot)
-    print("delete ratio:", len3 / tot)
-    print("add ratio:", len4 / tot)
-    print("swap ratio:", len5 / tot)
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="preprocess data")
-    parser.add_argument("--start", type=int)
-    parser.add_argument("--end", type=int)
-    args = parser.parse_args()
+    past = datetime.datetime.now()
+    text = ["바다는 비에 젖지 않는다." for i in range(1000)]
+    noised = []
 
-    for lines, dir, filename in tqdm(yield_data(args), total=get_file_num()):
-        original = []
-        g2p_noise_added = []
-        delete_noise_added = []
-        add_noise_added = []
-        swap_noise_added = []
+    pool = Pool(8)
 
-        for line in lines[0 : len(lines) // 5]:
-            line = line.strip()
-            original.append(line + "\t" + line + "\n")
+    new_sentence = pool.map(g2p_noise, text)
+    noised.extend(new_sentence)
 
-        for line in lines[len(lines) // 5 + 1 : len(lines) * 3 // 5]:
-            line = line.strip()
-            g2p_noise_added.append(line + "\t" + inject_noise(line, "g2p") + "\n")
-
-        for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
-            line = line.strip()
-            delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
-
-        for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
-            line = line.strip()
-            add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
-
-        for line in lines[len(lines) * 13 // 15 + 1 :]:
-            line = line.strip()
-            swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
-
-        output_path = "./data/corrupted/" + dir + "/" + filename
-        output_f = open(output_path, "w")
-        output_f.writelines(original)
-        output_f.writelines(g2p_noise_added)
-        output_f.writelines(delete_noise_added)
-        output_f.writelines(add_noise_added)
-        output_f.writelines(swap_noise_added)
-        output_f.close()
+    now = datetime.datetime.now()
+    with open("./test2.txt", "w+") as f:
+        f.write("\n".join(noised))
+    print(now - past)
