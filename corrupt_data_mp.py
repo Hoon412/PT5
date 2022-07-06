@@ -1,4 +1,3 @@
-import argparse
 import os
 import random
 
@@ -91,13 +90,13 @@ JONGSUNG_LIST = [
 ]
 
 DIRS = [
-    "NIKL_GOO_v1.0",
-    "NIKL_KParlty_2021_v1.0",
-    "NIKL_MOON_v1.0",
-    "NIKL_NEWSPAPER_2021_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.1",
-    # "NIKL_NEWSPAPER_2021_v2.0",
-    "wiki_text",
+    # "NIKL_GOO_v1.0",
+    # "NIKL_KParlty_2021_v1.0",
+    # "NIKL_MOON_v1.0",
+    # "NIKL_NEWSPAPER_2021_v1.0",
+    "NIKL_NEWSPAPER_2021_v1.1",
+    "NIKL_NEWSPAPER_2021_v2.0",
+    # "wiki_text",
 ]
 
 
