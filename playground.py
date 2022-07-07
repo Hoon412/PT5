@@ -1,3 +1,4 @@
+import argparse
 from jamo import h2j, j2hcj
 from unicode import join_jamos
 from g2pk import G2p
@@ -185,15 +186,18 @@ if __name__ == "__main__":
         "1234, 2000, 3000",
         "1,123 2,000 3,000",
     ]
+    text = [
+        "부작용도 있다.",
+        "한국 기업들의 성장세가 심각한 수준까지 꺾이고 있다.",
+    ]
     noised = []
 
     # pool = Pool(8)
     # new_sentence = pool.map(g2p_noise, text)
     # noised.extend(new_sentence)
 
-    for sentence in text:
-        noised.append(g2p_noise(sentence))
-        noised.append(g2pk.numerals.convert_num("3시/B 10분/B에 만나자."))
+    # for sentence in text:
+    #     noised.append(g2p_noise(sentence))
     # for sentence in text:
     #     noised.append(add_noise(sentence))
     # for sentence in text:
@@ -201,5 +205,8 @@ if __name__ == "__main__":
     # for sentence in text:
     #     noised.append(swap_noise(sentence))
 
-    with open("./test2.txt", "w+") as f:
-        f.write("\n".join(noised))
+    # with open("./test2.txt", "w+") as f:
+    #     f.write("\n".join(noised))
+    parser = argparse.ArgumentParser(description="example")
+    args = parser.parse_args()
+    print(args)

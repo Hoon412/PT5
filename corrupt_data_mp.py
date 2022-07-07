@@ -94,7 +94,7 @@ DIRS = [
     # "NIKL_KParlty_2021_v1.0",
     # "NIKL_MOON_v1.0",
     # "NIKL_NEWSPAPER_2021_v1.0",
-    "NIKL_NEWSPAPER_2021_v1.1",
+    # "NIKL_NEWSPAPER_2021_v1.1",
     "NIKL_NEWSPAPER_2021_v2.0",
     # "wiki_text",
 ]
@@ -133,7 +133,7 @@ def g2p_noise(text):
     try:
         noised = g2p(text)
     except:
-        output_path = "./data/debug/" + "hing.txt"
+        output_path = "./debug/hing.txt"
         noised = text + "\n"
         f = open(output_path, "a")
         f.writelines(noised)
