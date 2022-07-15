@@ -8,11 +8,17 @@ def indexing(data_path, json_path):
     count = 0
     while True:
         offset = f.tell()
-        offset_dict[count] = offset
-        count += 1
         line = f.readline()
         if not line:
             break
+        else:
+            if len(line.split("\t")) != 2:
+                print(line, len(line.split("\t")))
+                continue
+            else:
+                offset_dict[count] = offset
+                count += 1
+
     f.close()
 
     f = open(json_path, "w")
@@ -21,8 +27,8 @@ def indexing(data_path, json_path):
 
 start = datetime.datetime.now()
 
-train_path = "./data/train.tsv"
-dev_path = "./data/dev.tsv"
+train_path = "./data/train_99.tsv"
+dev_path = "./data/dev_99.tsv"
 
 train_sample_path = "./data/train_sample.tsv"
 dev_sample_path = "./data/dev_sample.tsv"
@@ -30,12 +36,13 @@ dev_sample_path = "./data/dev_sample.tsv"
 print("offset dict processing..")
 train_dict = indexing(
     train_path,
-    "./data/train_index.json",
+    "./data/train_index_99.json",
 )
 dev = indexing(
     dev_path,
-    "./data/dev_index.json",
+    "./data/dev_index_99.json",
 )
 
 end = datetime.datetime.now()
-print(start - end, "소요됨")
+print(end - start, "소요됨")
+# approximately 2시간

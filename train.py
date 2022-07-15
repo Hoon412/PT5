@@ -1,48 +1,40 @@
-import multiprocessing
-import os
-import pandas as pd
-import torch
 import argparse
-import json
-
+import torch
+import pandas as pd
 from torch.utils.data import Dataset
-from transformers.utils import logging
 from transformers import Trainer, TrainingArguments
 from transformers import T5Tokenizer, T5ForConditionalGeneration
-from multiprocessing import Pool
-from tqdm import tqdm
 
 
 class MyDataset(Dataset):
-    def __init__(self, data_path, offset_dict, tokenizer, source_len, target_len):
-        self.data_path = data_path
-        self.data_file = open(data_path, "r")
-        self.offset_dict = offset_dict
+    def __init__(
+        self, dataframe, tokenizer, source_len, target_len, source_text, noised_text
+    ):
+        self.data = dataframe
         self.tokenizer = tokenizer
         self.source_len = source_len
         self.target_len = target_len
+        self.noised_text = self.data[noised_text]
+        self.source_text = self.data[source_text]
 
     def __len__(self):
-        return len(self.offset_dict)
+        return len(self.noised_text)
 
     def __getitem__(self, index):
-        offset = self.offset_dict[str(index)]
-        self.data_file.seek(offset)
-        line = self.data_file.readline()
-
-        splited = line.strip().split("\t")
-        source_text = splited[0]
-        noised_text = splited[1]
+        source_text = str(self.noised_text[index])
+        target_text = str(self.source_text[index])
+        source_text = " ".join(source_text.split())
+        target_text = " ".join(target_text.split())
 
         source = self.tokenizer.batch_encode_plus(
-            [noised_text],
+            [source_text],
             max_length=self.source_len,
             padding="max_length",
             truncation=True,
             return_tensors="pt",
         )
         target = self.tokenizer.batch_encode_plus(
-            [source_text],
+            [target_text],
             max_length=self.target_len,
             padding="max_length",
             truncation=True,
@@ -59,25 +51,66 @@ class MyDataset(Dataset):
             "label_ids": target_ids.to(dtype=torch.long),
         }
 
+    def test_dataset(self):
+        file = open(self.data_path, "r")
+        for i in range(5):
+            line = file.readline().strip()
+            print("line", i, ":", line)
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="trainer")
+    parser.add_argument("--model", required=True, help="pretrained model")
+    parser.add_argument("--train-batch-size", required=True, type=int, help="batch")
+    parser.add_argument("--dev-batch-size", required=True, type=int, help="batch")
+    parser.add_argument("--lr", required=True, type=float, help="learning rate")
+    parser.add_argument("--max-source-len", required=True, type=int, help="length")
+    parser.add_argument("--max-target-len", required=True, type=int, help="length")
+    parser.add_argument("--seed", required=True, type=int, help="train seed")
+    parser.add_argument("--train-data-path", required=True, help="train data path")
+    parser.add_argument("--dev-data-path", required=True, help="dev data path")
+    parser.add_argument("--output-path", required=True, help="output path")
+    parser.add_argument("--epochs", required=True, type=int, help="epochs")
+    parser.add_argument("--eval-strategy", required=True, help="epoch or step")
+    parser.add_argument("--eval-steps", type=int, help="step")
+    parser.add_argument("--save-strategy", required=True, help="epoch or step")
+    parser.add_argument("--save-steps", type=int, help="epoch or step")
+    parser.add_argument("--eval-acc-step", required=True, type=int, help="step")
+    parser.add_argument("--train-acc-step", required=True, type=int, help="step")
+    parser.add_argument("--logging-step", required=True, type=int, help="logging")
+    parser.add_argument("--num-worker", required=True, type=int, help="cpus")
+    parser.add_argument("--local_rank", type=int, default=0)
+    args = parser.parse_args()
+    print(args)
+
     model_params = {
-        "MODEL": "KETI-AIR/ke-t5-base-ko",
-        "TRAIN_BATCH_SIZE": 12,
-        "VALID_BATCH_SIZE": 12,
-        "LEARNING_RATE": 5e-4,
-        "MAX_SOURCE_TEXT_LENGTH": 128,
-        "MAX_TARGET_TEXT_LENGTH": 128,
-        "SEED": 428,
+        "MODEL": args.model,
+        "TRAIN_BATCH_SIZE": args.train_batch_size,
+        "VALID_BATCH_SIZE": args.dev_batch_size,
+        "LEARNING_RATE": args.lr,
+        "MAX_SOURCE_TEXT_LENGTH": args.max_source_len,
+        "MAX_TARGET_TEXT_LENGTH": args.max_target_len,
+        "SEED": args.seed,
+        "OUTPUT": args.output_path,
+        "EPOCHS": args.epochs,
+        "EVAL_STRATEGY": args.eval_strategy,
+        "EVAL_STEPS": args.eval_steps,
+        "SAVE_STRATEGY": args.save_strategy,
+        "SAVE_STEPS": args.save_steps,
+        "EVAL_ACC_STEP": args.eval_acc_step,
+        "TRAIN_ACC_STEP": args.train_acc_step,
+        "LOGGING_STEP": args.logging_step,
+        "CPUS": args.num_worker,
     }
 
-    # if os.environ["LOCAL_RANK"] == 0:  # only on main process
-    #     logging.set_verbosity_info()
+    train_data_path = args.train_data_path
+    dev_data_path = args.dev_data_path
 
-    # train_data_path = "./data/train_sample.tsv"
-    # dev_data_path = "./data/dev_sample.tsv"
-    train_data_path = "./data/train.tsv"
-    dev_data_path = "./data/dev.tsv"
+    print("data loading...")
+    train_df = pd.read_csv(train_data_path, sep="\t", on_bad_lines="skip")
+    dev_df = pd.read_csv(dev_data_path, sep="\t", on_bad_lines="skip")
+    print(train_df)
+    print(dev_df)
 
     print("model loading...")
     tokenizer = T5Tokenizer.from_pretrained(
@@ -85,55 +118,50 @@ if __name__ == "__main__":
     )
     model = T5ForConditionalGeneration.from_pretrained(model_params["MODEL"])
 
-    print("dataset loading...")
-    train_index_json = open("./data/train_index.json", "r")
-    dev_index_json = open("./data/dev_index.json", "r")
-    train_index_json = json.load(train_index_json)
-    dev_index_json = json.load(dev_index_json)
-    print("train:", len(train_index_json), "dev:", len(dev_index_json), "loaded")
-
     training_set = MyDataset(
-        train_data_path,
-        train_index_json,
+        train_df,
         tokenizer,
         model_params["MAX_SOURCE_TEXT_LENGTH"],
         model_params["MAX_TARGET_TEXT_LENGTH"],
+        "source",
+        "noised",
     )
     val_set = MyDataset(
-        dev_data_path,
-        dev_index_json,
+        dev_df,
         tokenizer,
         model_params["MAX_SOURCE_TEXT_LENGTH"],
         model_params["MAX_TARGET_TEXT_LENGTH"],
+        "source",
+        "noised",
     )
 
-    args = TrainingArguments(
-        output_dir="outputs/",
-        evaluation_strategy="epoch",
+    training_args = TrainingArguments(
+        output_dir=model_params["OUTPUT"],
+        evaluation_strategy=model_params["EVAL_STRATEGY"],
+        eval_steps=model_params["EVAL_STEPS"],
         per_device_train_batch_size=model_params["TRAIN_BATCH_SIZE"],
         per_device_eval_batch_size=model_params["VALID_BATCH_SIZE"],
-        num_train_epochs=10,
+        num_train_epochs=model_params["EPOCHS"],
         seed=model_params["SEED"],
-        eval_accumulation_steps=4,
-        gradient_accumulation_steps=32,
-        save_strategy="epoch",
+        eval_accumulation_steps=model_params["EVAL_ACC_STEP"],
+        gradient_accumulation_steps=model_params["TRAIN_ACC_STEP"],
+        save_strategy=model_params["SAVE_STRATEGY"],
+        save_steps=model_params["SAVE_STEPS"],
         logging_first_step=True,
         logging_strategy="steps",
-        logging_steps=100,
+        logging_steps=model_params["LOGGING_STEP"],
         disable_tqdm=True,
         learning_rate=model_params["LEARNING_RATE"],
-        dataloader_num_workers=16,
+        dataloader_num_workers=model_params["CPUS"],
         report_to="wandb",
     )
 
     print("training...")
     trainer = Trainer(
         model=model,
-        args=args,
+        args=training_args,
         train_dataset=training_set,
         eval_dataset=val_set,
     )
 
     trainer.train()
-
-# python -m torch.distributed.launch --nproc_per_node=2 train.py

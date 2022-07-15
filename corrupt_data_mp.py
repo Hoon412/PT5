@@ -1,9 +1,10 @@
+import argparse
 import os
 import random
+import datetime
 
-from tqdm import tqdm
 from g2pk import G2p
-from multiprocessing import Pool
+from multiprocessing import Pool, Value
 from unicode import join_jamos
 from jamo import h2j, j2hcj
 
@@ -89,44 +90,14 @@ JONGSUNG_LIST = [
     "ㅎ",
 ]
 
-DIRS = [
-    # "NIKL_GOO_v1.0",
-    # "NIKL_KParlty_2021_v1.0",
-    # "NIKL_MOON_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.0",
-    # "NIKL_NEWSPAPER_2021_v1.1",
-    "NIKL_NEWSPAPER_2021_v2.0",
-    # "wiki_text",
-]
 
-
-def get_file_num():
+def get_filepaths():
     path = "./data/processed"
-    acc = 0
-    for dir in DIRS:
-        acc += len(os.listdir(path + "/" + dir))
-    return acc
-
-
-def get_filepathes():
-    path = "./data/processed"
-    filepathes = []
-    for dir in DIRS:
-        filenames = os.listdir(path + "/" + dir)
-        for filename in filenames:
-            filepathes.append(path + "/" + dir + "/" + filename)
-    return filepathes
-
-
-def yield_data():
-    path = "./data/processed"
-
-    for dir in DIRS:
-        for filename in os.listdir(path + "/" + dir):
-            f = open(path + "/" + dir + "/" + filename, "r")
-            lines = f.readlines()
-            random.shuffle(lines)
-            yield lines, dir, filename  # [approxmately 50000 lines], "dir_name", "file_name"
+    filenames = os.listdir(path)
+    filepaths = []
+    for filename in filenames:
+        filepaths.append(path + "/" + filename)
+    return filepaths
 
 
 def g2p_noise(text):
@@ -137,7 +108,6 @@ def g2p_noise(text):
         noised = text + "\n"
         f = open(output_path, "a")
         f.writelines(noised)
-    # noised = text
     return noised
 
 
@@ -227,77 +197,19 @@ def inject_noise(line, type):
     if type == "g2p":
         return g2p_noise(line)
     elif type == "del":
-        return add_noise(line)
-    elif type == "add":
         return delete_noise(line)
+    elif type == "add":
+        return add_noise(line)
     elif type == "swap":
         return swap_noise(line)
     else:
         return line
 
 
-def calc_ratio(l1, l2, l3, l4, l5):
-    len1 = len(l1)
-    len2 = len(l2)
-    len3 = len(l3)
-    len4 = len(l4)
-    len5 = len(l5)
-    tot = len1 + len2 + len3 + len4 + len5
-    print("original ratio:", len1 / tot)
-    print("g2p ratio:", len2 / tot)
-    print("delete ratio:", len3 / tot)
-    print("add ratio:", len4 / tot)
-    print("swap ratio:", len5 / tot)
-
-
-def main(args):
-    for lines, dir, filename in tqdm(yield_data(), total=get_file_num()):
-        original = []
-        g2p_noise_added = []
-        delete_noise_added = []
-        add_noise_added = []
-        swap_noise_added = []
-
-        for line in lines[0 : len(lines) // 5]:
-            line = line.strip()
-            original.append(line + "\t" + line + "\n")
-
-        for line in lines[len(lines) // 5 + 1 : len(lines) * 3 // 5]:
-            line = line.strip()
-            g2p_noise_added.append(line + "\t" + inject_noise(line, "g2p") + "\n")
-
-        for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
-            line = line.strip()
-            delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
-
-        for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
-            line = line.strip()
-            add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
-
-        for line in lines[len(lines) * 13 // 15 + 1 :]:
-            line = line.strip()
-            swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
-
-        output_path = "./data/corrupted/" + dir + "/mp_" + filename
-        output_f = open(output_path, "w")
-        output_f.writelines(original)
-        output_f.writelines(g2p_noise_added)
-        output_f.writelines(delete_noise_added)
-        output_f.writelines(add_noise_added)
-        output_f.writelines(swap_noise_added)
-        output_f.close()
-
-
-def noise_file(filepath):
-    splited = filepath.split("/")
-    filename = splited[-1]
-    dir = splited[3]
-
+def noise_file(original_ratio, g2p_ratio, edit_distance_ratio, filepath):
     f = open(filepath)
     lines = f.readlines()
     random.shuffle(lines)
-
-    print(filepath, "start")
 
     original = []
     g2p_noise_added = []
@@ -305,39 +217,75 @@ def noise_file(filepath):
     add_noise_added = []
     swap_noise_added = []
 
-    for line in lines[0 : len(lines) // 5]:
+    for line in lines[0 : int(len(lines) * original_ratio)]:
         line = line.strip()
         original.append(line + "\t" + line + "\n")
-
-    for line in lines[len(lines) // 5 + 1 : len(lines) * 3 // 5]:
+    for line in lines[
+        int(len(lines) * original_ratio) : int(
+            len(lines) * (original_ratio + g2p_ratio)
+        )
+    ]:
         line = line.strip()
         g2p_noise_added.append(line + "\t" + inject_noise(line, "g2p") + "\n")
+    for line in lines[
+        int(len(lines) * (original_ratio + g2p_ratio)) : int(
+            len(lines) * (original_ratio + g2p_ratio + edit_distance_ratio / 3)
+        )
+    ]:
+        line = line.strip()
+        delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
+    for line in lines[
+        int(len(lines) * (original_ratio + g2p_ratio + edit_distance_ratio / 3)) : int(
+            len(lines) * (original_ratio + g2p_ratio + 2 * edit_distance_ratio / 3)
+        )
+    ]:
+        line = line.strip()
+        add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
+    for line in lines[
+        int(len(lines) * (original_ratio + g2p_ratio + 2 * edit_distance_ratio / 3)) :
+    ]:
+        line = line.strip()
+        swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
 
-    # for line in lines[len(lines) * 3 // 5 + 1 : len(lines) * 11 // 15]:
-    #     line = line.strip()
-    #     delete_noise_added.append(line + "\t" + inject_noise(line, "del") + "\n")
-
-    # for line in lines[len(lines) * 11 // 15 + 1 : len(lines) * 13 // 15]:
-    #     line = line.strip()
-    #     add_noise_added.append(line + "\t" + inject_noise(line, "add") + "\n")
-
-    # for line in lines[len(lines) * 13 // 15 + 1 :]:
-    #     line = line.strip()
-    #     swap_noise_added.append(line + "\t" + inject_noise(line, "swap") + "\n")
-
-    # output_path = "./data/debug/" + "/mp_" + filename
-    # print("saving at", output_path)
-    # output_f = open(output_path, "w")
-    # output_f.writelines(original)
-    # output_f.writelines(g2p_noise_added)
-    # output_f.writelines(delete_noise_added)
-    # output_f.writelines(add_noise_added)
-    # output_f.writelines(swap_noise_added)
-    # output_f.close()
+    output_path = filepath.replace(
+        "processed",
+        "corrupted_{}_{}_{}".format(original_ratio, g2p_ratio, edit_distance_ratio),
+    )
+    print("save at", output_path)
+    output_f = open(output_path, "w")
+    output_f.writelines(original)
+    output_f.writelines(g2p_noise_added)
+    output_f.writelines(delete_noise_added)
+    output_f.writelines(add_noise_added)
+    output_f.writelines(swap_noise_added)
+    output_f.close()
 
 
 if __name__ == "__main__":
-    filepathes = get_filepathes()
-    # print(multiprocessing.cpu_count())
+    start = datetime.datetime.now()
+    parser = argparse.ArgumentParser(description="corrupt data argparser")
+    parser.add_argument("--original-ratio", required=True, type=float)
+    parser.add_argument("--g2p-ratio", required=True, type=float)
+    parser.add_argument("--edit-distance-ratio", required=True, type=float)
+    args = parser.parse_args()
+
+    os.makedirs(
+        "./data/corrupted_{}_{}_{}/".format(
+            args.original_ratio, args.g2p_ratio, args.edit_distance_ratio
+        ),
+        exist_ok=True,
+    )
+
+    filepaths = get_filepaths()
+    noise_params = []
+    for filepath in filepaths:
+        noise_params.append(
+            (args.original_ratio, args.g2p_ratio, args.edit_distance_ratio, filepath)
+        )
+
     pool = Pool(64)
-    pool.map(noise_file, filepathes)
+    pool.starmap(noise_file, noise_params)
+    end = datetime.datetime.now()
+    print(end - start, " 소요됨")
+
+# ls -al | grep ^- | wc -l

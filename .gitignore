@@ -2,3 +2,6 @@ data/
 model/
 backup/
 __pycache__/
+wandb/
+debug/
+outputs/
